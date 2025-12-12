@@ -1,5 +1,6 @@
 import { Octokit } from '@octokit/rest';
 import { logger } from '../utils/logger';
+import { EXTENSION_CATEGORY_MAP, KEYWORD_CATEGORY_MAP, COMMIT_PATTERNS, FILE_STATUS_INDICATORS } from '../constants';
 
 interface CreatePRArgs {
   owner: string;
@@ -48,11 +49,11 @@ export class CreatePRTool {
 
       if (auto_generate) {
         const analysis = await this.analyzeChanges(owner, repo, head, base);
-        
+
         if (!title) {
           title = this.generateProfessionalTitle(analysis);
         }
-        
+
         if (!body) {
           body = this.generateComprehensiveBody(analysis);
         }
@@ -181,94 +182,54 @@ export class CreatePRTool {
   private categorizeFiles(files: FileChange[]): Record<string, FileChange[]> {
     const categories: Record<string, FileChange[]> = {};
 
-    files.forEach(file => {
+    for (const file of files) {
       let category = 'Other Files';
-      
-      if (file.filename.includes('test') || file.filename.includes('spec')) {
-        category = 'Test Files';
-      } else if (file.filename.match(/\.(md|txt|rst)$/i)) {
-        category = 'Documentation';
-      } else if (file.filename.match(/\.(ts|tsx)$/i)) {
-        if (file.filename.includes('component') || file.filename.includes('Component')) {
-          category = 'React Components';
-        } else if (file.filename.includes('hook')) {
-          category = 'React Hooks';
-        } else if (file.filename.includes('util') || file.filename.includes('helper')) {
-          category = 'Utility Functions';
-        } else if (file.filename.includes('api') || file.filename.includes('service')) {
-          category = 'API Services';
-        } else if (file.filename.includes('type') || file.filename.includes('interface')) {
-          category = 'Type Definitions';
-        } else if (file.filename.includes('model')) {
-          category = 'Data Models';
-        } else if (file.filename.includes('controller')) {
-          category = 'Controllers';
-        } else if (file.filename.includes('middleware')) {
-          category = 'Middleware';
-        } else {
-          category = 'Source Code';
-        }
-      } else if (file.filename.match(/\.(js|jsx)$/i)) {
-        category = 'JavaScript Files';
-      } else if (file.filename.match(/\.(css|scss|sass|less)$/i)) {
-        category = 'Stylesheets';
-      } else if (file.filename.match(/package\.json|yarn\.lock|package-lock\.json/)) {
-        category = 'Package Dependencies';
-      } else if (file.filename.match(/\.(yml|yaml)$/i)) {
-        category = 'YAML Configuration';
-      } else if (file.filename.match(/\.(json)$/i)) {
-        category = 'JSON Configuration';
-      } else if (file.filename.match(/Dockerfile|docker-compose/)) {
-        category = 'Docker Configuration';
-      } else if (file.filename.match(/\.(sql)$/i)) {
-        category = 'Database Migrations';
+      const ext = file.filename.substring(file.filename.lastIndexOf('.')).toLowerCase();
+
+      if (EXTENSION_CATEGORY_MAP.has(ext)) {
+        category = EXTENSION_CATEGORY_MAP.get(ext)!;
       }
 
-      if (!categories[category]) {
-        categories[category] = [];
+      for (const [keyword, keywordCategory] of KEYWORD_CATEGORY_MAP) {
+        if (file.filename.includes(keyword)) {
+          category = keywordCategory;
+          break;
+        }
       }
+
+      if (file.filename.match(/package\.json|yarn\.lock|package-lock\.json/)) {
+        category = 'Package Dependencies';
+      } else if (file.filename.match(/Dockerfile|docker-compose/)) {
+        category = 'Docker Configuration';
+      }
+
+      if (!categories[category]) categories[category] = [];
       categories[category].push(file);
-    });
+    }
 
     return categories;
   }
 
   private analyzeCommitTypes(commits: CommitInfo[]): Record<string, CommitInfo[]> {
     const types: Record<string, CommitInfo[]> = {
-      features: [],
-      fixes: [],
-      refactoring: [],
-      performance: [],
-      documentation: [],
-      testing: [],
-      configuration: [],
-      dependencies: [],
-      other: [],
+      features: [], fixes: [], refactoring: [], performance: [],
+      documentation: [], testing: [], configuration: [], dependencies: [], other: []
     };
 
-    commits.forEach(commit => {
+    for (const commit of commits) {
       const message = commit.message.toLowerCase();
-      
-      if (message.match(/feat|feature|add|implement|create/)) {
-        types.features.push(commit);
-      } else if (message.match(/fix|bug|resolve|patch|correct/)) {
-        types.fixes.push(commit);
-      } else if (message.match(/refactor|restructure|reorganize|improve structure/)) {
-        types.refactoring.push(commit);
-      } else if (message.match(/perf|performance|optimize|speed|faster/)) {
-        types.performance.push(commit);
-      } else if (message.match(/docs|documentation|readme|comment/)) {
-        types.documentation.push(commit);
-      } else if (message.match(/test|spec|coverage/)) {
-        types.testing.push(commit);
-      } else if (message.match(/config|build|ci|cd|pipeline/)) {
-        types.configuration.push(commit);
-      } else if (message.match(/deps|dependencies|upgrade|update package/)) {
-        types.dependencies.push(commit);
-      } else {
-        types.other.push(commit);
+      let matched = false;
+
+      for (const [pattern, type] of COMMIT_PATTERNS) {
+        if (pattern.test(message)) {
+          types[type].push(commit);
+          matched = true;
+          break;
+        }
       }
-    });
+
+      if (!matched) types.other.push(commit);
+    }
 
     return types;
   }
@@ -380,7 +341,7 @@ export class CreatePRTool {
       }
     });
 
-    const hasPerformancePatterns = patterns.some(p => 
+    const hasPerformancePatterns = patterns.some(p =>
       p.type === 'sql-queries' || p.pattern.includes('Performance')
     );
     if (hasPerformancePatterns) {
@@ -395,7 +356,7 @@ export class CreatePRTool {
 
     commits.forEach(commit => {
       const message = commit.message;
-      
+
       const featureMatch = message.match(/(?:feat|feature|add|implement)(?:\(.*?\))?:\s*(.+)/i);
       if (featureMatch) {
         features.push(featureMatch[1].trim());
@@ -410,13 +371,13 @@ export class CreatePRTool {
     });
 
     const fileGroups = this.categorizeFiles(fileChanges);
-    
+
     if (fileGroups['React Components'] && fileGroups['React Components'].length > 0) {
       const componentNames = fileGroups['React Components'].map(f => {
         const match = f.filename.match(/([A-Z][a-zA-Z]+)\.tsx?$/);
         return match ? match[1] : null;
       }).filter(Boolean);
-      
+
       if (componentNames.length > 0) {
         features.push(`New React components: ${componentNames.join(', ')}`);
       }
@@ -517,7 +478,7 @@ export class CreatePRTool {
 
   private generateProfessionalTitle(analysis: any): string {
     const { commitTypes, stats, categories, features } = analysis;
-    
+
     const primaryType = Object.entries(commitTypes as Record<string, any[]>)
       .filter(([_, commits]) => commits.length > 0)
       .sort(([_, a], [__, b]) => b.length - a.length)[0];
@@ -527,38 +488,38 @@ export class CreatePRTool {
     }
 
     const [type] = primaryType;
-    
+
     switch (type) {
       case 'features':
         if (features && features.length > 0) {
           return `Feature: ${features[0].substring(0, 60)}${features[0].length > 60 ? '...' : ''}`;
         }
         return `Feature: Add new functionality (${stats.filesChanged} files)`;
-      
+
       case 'fixes':
         return `Fix: Resolve issues in ${Object.keys(categories)[0] || 'application'}`;
-      
+
       case 'refactoring':
         return `Refactor: Improve code structure and maintainability`;
-      
+
       case 'performance':
         return `Performance: Optimize application performance`;
-      
+
       case 'documentation':
         return `Documentation: Update project documentation`;
-      
+
       case 'testing':
         return `Testing: Add/update test coverage`;
-      
+
       case 'configuration':
         return `Configuration: Update project configuration`;
-      
+
       case 'dependencies':
         if (analysis.dependencies.added.length > 0) {
           return `Dependencies: Add ${analysis.dependencies.added[0]}${analysis.dependencies.added.length > 1 ? ' and others' : ''}`;
         }
         return `Dependencies: Update project dependencies`;
-      
+
       default:
         return `Update: ${stats.filesChanged} files changed`;
     }
@@ -581,7 +542,7 @@ export class CreatePRTool {
 
     if (technicalChanges && Object.values(technicalChanges).some((arr: any) => arr.length > 0)) {
       body += '## Technical Changes\n\n';
-      
+
       if (technicalChanges.architecturalChanges?.length > 0) {
         body += '### Architectural Updates\n';
         technicalChanges.architecturalChanges.forEach((change: string) => {
@@ -617,16 +578,16 @@ export class CreatePRTool {
 
     body += '## Changed Files Analysis\n\n';
     body += `Total: **${stats.filesChanged} files** | **+${stats.additions} additions** | **-${stats.deletions} deletions**\n\n`;
-    
+
     Object.entries(categories as Record<string, FileChange[]>).forEach(([category, files]) => {
       const categoryStats = {
         additions: files.reduce((sum, f) => sum + f.additions, 0),
         deletions: files.reduce((sum, f) => sum + f.deletions, 0),
       };
-      
+
       body += `### ${category} (${files.length} file${files.length !== 1 ? 's' : ''})\n\n`;
       body += `Changes: +${categoryStats.additions} / -${categoryStats.deletions}\n\n`;
-      
+
       const filesByDir: Record<string, FileChange[]> = {};
       files.forEach((file: FileChange) => {
         const dir = file.filename.substring(0, file.filename.lastIndexOf('/')) || 'root';
@@ -649,7 +610,7 @@ export class CreatePRTool {
       body += '## Impact Analysis\n\n';
       body += `**Risk Level:** ${impactAnalysis.riskLevel}\n`;
       body += `**Performance Impact:** ${impactAnalysis.performanceImpact}\n\n`;
-      
+
       if (impactAnalysis.affectedAreas?.length > 0) {
         body += '### Affected Areas\n';
         impactAnalysis.affectedAreas.forEach((area: string) => {
@@ -670,7 +631,7 @@ export class CreatePRTool {
 
     if (dependencies && Object.values(dependencies).some((arr: any) => arr.length > 0)) {
       body += '## Dependencies\n\n';
-      
+
       if (dependencies.added?.length > 0) {
         body += '### Added\n';
         dependencies.added.forEach((dep: string) => {
@@ -708,7 +669,7 @@ export class CreatePRTool {
     if (impactAnalysis?.potentialBreaking?.length > 0 || dependencies?.removed?.length > 0) {
       body += '## Migration Guide\n\n';
       body += 'This PR contains changes that may require updates to existing code:\n\n';
-      
+
       if (dependencies?.removed?.length > 0) {
         body += '1. **Removed Dependencies:** Ensure alternative implementations for removed packages\n';
       }
@@ -720,18 +681,18 @@ export class CreatePRTool {
     }
 
     body += '## Commit Details\n\n';
-    
+
     Object.entries(commitTypes as Record<string, CommitInfo[]>).forEach(([type, typeCommits]) => {
       if (typeCommits.length === 0) return;
-      
+
       const typeLabel = type.charAt(0).toUpperCase() + type.slice(1);
       body += `### ${typeLabel} (${typeCommits.length})\n\n`;
-      
+
       typeCommits.slice(0, 5).forEach((commit: CommitInfo) => {
         const shortMessage = commit.message.split('\n')[0];
         body += `- \`${commit.sha}\` ${shortMessage} - *${commit.author}*\n`;
       });
-      
+
       if (typeCommits.length > 5) {
         body += `- ... and ${typeCommits.length - 5} more\n`;
       }
@@ -744,33 +705,33 @@ export class CreatePRTool {
     body += '- [ ] Documentation updated\n';
     body += '- [ ] No console errors or warnings\n';
     body += '- [ ] Performance impact assessed\n';
-    
+
     if (impactAnalysis?.riskLevel === 'High') {
       body += '- [ ] Security review completed\n';
       body += '- [ ] Rollback plan prepared\n';
     }
-    
+
     if (dependencies?.added?.length > 0) {
       body += '- [ ] New dependencies reviewed for security\n';
       body += '- [ ] License compatibility verified\n';
     }
-    
+
     body += '- [ ] Deployment plan prepared\n';
-    
+
     body += '\n## Deployment Notes\n\n';
-    
+
     if (dependencies?.added?.length > 0 || dependencies?.updated?.length > 0) {
       body += '- Run `npm install` or `yarn install` to update dependencies\n';
     }
-    
+
     if (categories['Database Migrations']) {
       body += '- Execute database migrations before deployment\n';
     }
-    
+
     if (categories['Configuration'] || categories['YAML Configuration'] || categories['JSON Configuration']) {
       body += '- Review and update configuration settings\n';
     }
-    
+
     body += '- Monitor application logs after deployment\n';
     body += '- Be prepared to rollback if issues arise\n';
 
@@ -779,19 +740,19 @@ export class CreatePRTool {
 
   private generateExecutiveSummary(analysis: any): string {
     const { stats, commitTypes, impactAnalysis, features } = analysis;
-    
+
     let summary = 'This pull request ';
-    
+
     const commitCounts = Object.entries(commitTypes as Record<string, any[]>)
       .map(([type, commits]) => ({ type, count: commits.length }))
       .sort((a, b) => b.count - a.count);
-    
+
     if (commitCounts.length === 0 || commitCounts[0].count === 0) {
       summary += 'contains miscellaneous updates';
     } else {
       const primary = commitCounts[0];
       const secondary = commitCounts[1];
-      
+
       switch (primary.type) {
         case 'features':
           summary += `introduces ${primary.count} new feature${primary.count !== 1 ? 's' : ''}`;
@@ -811,41 +772,35 @@ export class CreatePRTool {
         default:
           summary += 'includes various improvements';
       }
-      
+
       if (secondary && secondary.count > 0) {
         summary += ` along with ${secondary.count} ${secondary.type.replace(/s$/, '')}${secondary.count !== 1 ? 's' : ''}`;
       }
     }
-    
+
     summary += `. The changes span ${stats.filesChanged} files with ${stats.additions} insertions and ${stats.deletions} deletions`;
-    
+
     if (impactAnalysis) {
       summary += `. Risk assessment: **${impactAnalysis.riskLevel}**`;
-      
+
       if (impactAnalysis.potentialBreaking?.length > 0) {
         summary += '. **Note:** This PR contains potential breaking changes that require careful review';
       }
     }
-    
+
     summary += '.';
-    
+
     return summary;
   }
 
   private getFileStatusIndicator(status: string): string {
-    const indicators: Record<string, string> = {
-      added: '[NEW]',
-      modified: '[MOD]',
-      removed: '[DEL]',
-      renamed: '[REN]',
-    };
-    return indicators[status] || '[CHG]';
+    return FILE_STATUS_INDICATORS[status] || '[CHG]';
   }
 
   private getChangeIndicator(additions: number, deletions: number): string {
     const total = additions + deletions;
     if (total === 0) return '';
-    
+
     if (total < 10) return '(minor changes)';
     if (total < 50) return '(moderate changes)';
     if (total < 200) return '(significant changes)';

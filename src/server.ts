@@ -11,12 +11,11 @@ import { GitHubClient } from './github/client';
 import { ReadPRTool } from './tools/read-pr';
 import { ListFilesTool } from './tools/list-files';
 import { ReadFileTool } from './tools/read-file';
-import { AddCommentTool } from './tools/add-comment';
-import { SubmitReviewTool } from './tools/submit-review';
-import { CreateIssueTool } from './tools/create-issue';
-import { UpdateIssueTool } from './tools/update-issue';
-import { CloseIssueTool } from './tools/close-issue';
 import { createPRTool } from './tools/create-pr';
+import { ManageIssueTool } from './tools/manage-issue';
+import { RepoInfoTool } from './tools/repo-info';
+import { ReviewPRTool } from './tools/review-pr';
+import { SearchCodeTool } from './tools/search-code';
 import { MCPTool } from './types/mcp';
 import { createLogger } from './utils/logger';
 import { z } from 'zod';
@@ -54,11 +53,10 @@ export class GitHubPRServer {
       new ReadPRTool(this.githubClient),
       new ListFilesTool(this.githubClient),
       new ReadFileTool(this.githubClient),
-      new AddCommentTool(this.githubClient),
-      new SubmitReviewTool(this.githubClient),
-      new CreateIssueTool(this.githubClient),
-      new UpdateIssueTool(this.githubClient),
-      new CloseIssueTool(this.githubClient)
+      new ManageIssueTool(this.githubClient),
+      new RepoInfoTool(this.githubClient),
+      new ReviewPRTool(this.githubClient),
+      new SearchCodeTool(this.githubClient)
     ];
 
     // Register create-pr tool with manual JSON schema conversion
@@ -79,7 +77,7 @@ export class GitHubPRServer {
   private setupHandlers(): void {
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
       logger.debug('Listing available tools');
-      
+
       const tools = Array.from(this.tools.values()).map(tool => ({
         name: tool.name,
         description: tool.description,
@@ -91,7 +89,7 @@ export class GitHubPRServer {
 
     this.server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest) => {
       const { name, arguments: args } = request.params;
-      
+
       logger.info({ tool: name, args }, 'Tool called');
 
       const tool = this.tools.get(name);
@@ -103,7 +101,7 @@ export class GitHubPRServer {
       }
 
       const response = await tool.handler(args);
-      
+
       if (response.isError) {
         logger.error({ tool: name, response }, 'Tool returned error');
       } else {
@@ -138,41 +136,41 @@ export class GitHubPRServer {
       const shape = schema.shape;
       const properties: any = {};
       const required: string[] = [];
-      
+
       for (const [key, value] of Object.entries(shape)) {
         const fieldSchema = value as z.ZodSchema<any>;
         properties[key] = this.zodFieldToJsonSchema(fieldSchema);
-        
+
         if (!fieldSchema.isOptional()) {
           required.push(key);
         }
       }
-      
+
       return {
         type: 'object',
         properties,
         required: required.length > 0 ? required : undefined
       };
     }
-    
+
     return {};
   }
 
   private zodFieldToJsonSchema(schema: z.ZodSchema<any>): any {
     if (schema instanceof z.ZodString) {
-      return { 
+      return {
         type: 'string',
         description: (schema as any)._def.description
       };
     }
     if (schema instanceof z.ZodNumber) {
-      return { 
+      return {
         type: 'number',
         description: (schema as any)._def.description
       };
     }
     if (schema instanceof z.ZodBoolean) {
-      return { 
+      return {
         type: 'boolean',
         description: (schema as any)._def.description
       };
@@ -197,8 +195,8 @@ export class GitHubPRServer {
     }
     if (schema instanceof z.ZodDefault) {
       const innerSchema = this.zodFieldToJsonSchema((schema as any)._def.innerType);
-      return { 
-        ...innerSchema, 
+      return {
+        ...innerSchema,
         default: (schema as any)._def.defaultValue(),
         required: false
       };
@@ -206,21 +204,21 @@ export class GitHubPRServer {
     if (schema instanceof z.ZodObject) {
       return this.zodToJsonSchema(schema);
     }
-    
+
     return { type: 'any' };
   }
 
   async start(): Promise<void> {
     const transport = new StdioServerTransport();
-    
+
     // Skip GitHub connection test to avoid startup issues
     // Connection will be tested on first API call
     logger.info('Starting MCP server without initial GitHub test...');
-    
+
     try {
       await this.server.connect(transport);
       logger.info('MCP server started successfully');
-      
+
       // Test GitHub connection in background (non-blocking)
       this.githubClient.testConnection().then(connected => {
         if (connected) {

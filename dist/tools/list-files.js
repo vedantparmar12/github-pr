@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ListFilesTool = void 0;
 const mcp_1 = require("../types/mcp");
 const logger_1 = require("../utils/logger");
+const constants_1 = require("../constants");
 const logger = (0, logger_1.createLogger)('ListFilesTool');
 class ListFilesTool {
     name = 'list-files';
@@ -95,16 +96,7 @@ Use \`read-file\` with a specific filename to examine the changes in detail.`;
         return lines.join('\n');
     }
     getStatusBadge(status) {
-        const badges = {
-            'added': '[+]',
-            'modified': '[M]',
-            'removed': '[-]',
-            'renamed': '[R]',
-            'copied': '[C]',
-            'changed': '[~]',
-            'unchanged': '[ ]'
-        };
-        return badges[status] || '[?]';
+        return constants_1.FILE_STATUS_BADGES[status] || '[?]';
     }
 }
 exports.ListFilesTool = ListFilesTool;

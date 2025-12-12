@@ -17,8 +17,8 @@ declare const CloseIssueInputSchema: z.ZodObject<{
     owner: string;
     repo: string;
     issue_number: number;
-    reason?: "completed" | "not_planned" | undefined;
     comment?: string | undefined;
+    reason?: "completed" | "not_planned" | undefined;
 }>;
 export declare class CloseIssueTool implements MCPTool {
     private githubClient;
@@ -40,8 +40,8 @@ export declare class CloseIssueTool implements MCPTool {
         owner: string;
         repo: string;
         issue_number: number;
-        reason?: "completed" | "not_planned" | undefined;
         comment?: string | undefined;
+        reason?: "completed" | "not_planned" | undefined;
     }>;
     constructor(githubClient: GitHubClient);
     handler(args: z.infer<typeof CloseIssueInputSchema>): Promise<ToolResponse>;

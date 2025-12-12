@@ -8,12 +8,11 @@ const client_1 = require("./github/client");
 const read_pr_1 = require("./tools/read-pr");
 const list_files_1 = require("./tools/list-files");
 const read_file_1 = require("./tools/read-file");
-const add_comment_1 = require("./tools/add-comment");
-const submit_review_1 = require("./tools/submit-review");
-const create_issue_1 = require("./tools/create-issue");
-const update_issue_1 = require("./tools/update-issue");
-const close_issue_1 = require("./tools/close-issue");
 const create_pr_1 = require("./tools/create-pr");
+const manage_issue_1 = require("./tools/manage-issue");
+const repo_info_1 = require("./tools/repo-info");
+const review_pr_1 = require("./tools/review-pr");
+const search_code_1 = require("./tools/search-code");
 const logger_1 = require("./utils/logger");
 const zod_1 = require("zod");
 const logger = (0, logger_1.createLogger)('MCPServer');
@@ -41,11 +40,10 @@ class GitHubPRServer {
             new read_pr_1.ReadPRTool(this.githubClient),
             new list_files_1.ListFilesTool(this.githubClient),
             new read_file_1.ReadFileTool(this.githubClient),
-            new add_comment_1.AddCommentTool(this.githubClient),
-            new submit_review_1.SubmitReviewTool(this.githubClient),
-            new create_issue_1.CreateIssueTool(this.githubClient),
-            new update_issue_1.UpdateIssueTool(this.githubClient),
-            new close_issue_1.CloseIssueTool(this.githubClient)
+            new manage_issue_1.ManageIssueTool(this.githubClient),
+            new repo_info_1.RepoInfoTool(this.githubClient),
+            new review_pr_1.ReviewPRTool(this.githubClient),
+            new search_code_1.SearchCodeTool(this.githubClient)
         ];
         // Register create-pr tool with manual JSON schema conversion
         this.tools.set(create_pr_1.createPRTool.name, {

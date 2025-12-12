@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.createPRTool = exports.CreatePRTool = void 0;
 const rest_1 = require("@octokit/rest");
 const logger_1 = require("../utils/logger");
+const constants_1 = require("../constants");
 class CreatePRTool {
     octokit;
     constructor(token) {
@@ -136,113 +137,48 @@ class CreatePRTool {
     }
     categorizeFiles(files) {
         const categories = {};
-        files.forEach(file => {
+        for (const file of files) {
             let category = 'Other Files';
-            if (file.filename.includes('test') || file.filename.includes('spec')) {
-                category = 'Test Files';
+            const ext = file.filename.substring(file.filename.lastIndexOf('.')).toLowerCase();
+            if (constants_1.EXTENSION_CATEGORY_MAP.has(ext)) {
+                category = constants_1.EXTENSION_CATEGORY_MAP.get(ext);
             }
-            else if (file.filename.match(/\.(md|txt|rst)$/i)) {
-                category = 'Documentation';
-            }
-            else if (file.filename.match(/\.(ts|tsx)$/i)) {
-                if (file.filename.includes('component') || file.filename.includes('Component')) {
-                    category = 'React Components';
-                }
-                else if (file.filename.includes('hook')) {
-                    category = 'React Hooks';
-                }
-                else if (file.filename.includes('util') || file.filename.includes('helper')) {
-                    category = 'Utility Functions';
-                }
-                else if (file.filename.includes('api') || file.filename.includes('service')) {
-                    category = 'API Services';
-                }
-                else if (file.filename.includes('type') || file.filename.includes('interface')) {
-                    category = 'Type Definitions';
-                }
-                else if (file.filename.includes('model')) {
-                    category = 'Data Models';
-                }
-                else if (file.filename.includes('controller')) {
-                    category = 'Controllers';
-                }
-                else if (file.filename.includes('middleware')) {
-                    category = 'Middleware';
-                }
-                else {
-                    category = 'Source Code';
+            for (const [keyword, keywordCategory] of constants_1.KEYWORD_CATEGORY_MAP) {
+                if (file.filename.includes(keyword)) {
+                    category = keywordCategory;
+                    break;
                 }
             }
-            else if (file.filename.match(/\.(js|jsx)$/i)) {
-                category = 'JavaScript Files';
-            }
-            else if (file.filename.match(/\.(css|scss|sass|less)$/i)) {
-                category = 'Stylesheets';
-            }
-            else if (file.filename.match(/package\.json|yarn\.lock|package-lock\.json/)) {
+            if (file.filename.match(/package\.json|yarn\.lock|package-lock\.json/)) {
                 category = 'Package Dependencies';
-            }
-            else if (file.filename.match(/\.(yml|yaml)$/i)) {
-                category = 'YAML Configuration';
-            }
-            else if (file.filename.match(/\.(json)$/i)) {
-                category = 'JSON Configuration';
             }
             else if (file.filename.match(/Dockerfile|docker-compose/)) {
                 category = 'Docker Configuration';
             }
-            else if (file.filename.match(/\.(sql)$/i)) {
-                category = 'Database Migrations';
-            }
-            if (!categories[category]) {
+            if (!categories[category])
                 categories[category] = [];
-            }
             categories[category].push(file);
-        });
+        }
         return categories;
     }
     analyzeCommitTypes(commits) {
         const types = {
-            features: [],
-            fixes: [],
-            refactoring: [],
-            performance: [],
-            documentation: [],
-            testing: [],
-            configuration: [],
-            dependencies: [],
-            other: [],
+            features: [], fixes: [], refactoring: [], performance: [],
+            documentation: [], testing: [], configuration: [], dependencies: [], other: []
         };
-        commits.forEach(commit => {
+        for (const commit of commits) {
             const message = commit.message.toLowerCase();
-            if (message.match(/feat|feature|add|implement|create/)) {
-                types.features.push(commit);
+            let matched = false;
+            for (const [pattern, type] of constants_1.COMMIT_PATTERNS) {
+                if (pattern.test(message)) {
+                    types[type].push(commit);
+                    matched = true;
+                    break;
+                }
             }
-            else if (message.match(/fix|bug|resolve|patch|correct/)) {
-                types.fixes.push(commit);
-            }
-            else if (message.match(/refactor|restructure|reorganize|improve structure/)) {
-                types.refactoring.push(commit);
-            }
-            else if (message.match(/perf|performance|optimize|speed|faster/)) {
-                types.performance.push(commit);
-            }
-            else if (message.match(/docs|documentation|readme|comment/)) {
-                types.documentation.push(commit);
-            }
-            else if (message.match(/test|spec|coverage/)) {
-                types.testing.push(commit);
-            }
-            else if (message.match(/config|build|ci|cd|pipeline/)) {
-                types.configuration.push(commit);
-            }
-            else if (message.match(/deps|dependencies|upgrade|update package/)) {
-                types.dependencies.push(commit);
-            }
-            else {
+            if (!matched)
                 types.other.push(commit);
-            }
-        });
+        }
         return types;
     }
     analyzeCodePatterns(fileChanges) {
@@ -709,13 +645,7 @@ class CreatePRTool {
         return summary;
     }
     getFileStatusIndicator(status) {
-        const indicators = {
-            added: '[NEW]',
-            modified: '[MOD]',
-            removed: '[DEL]',
-            renamed: '[REN]',
-        };
-        return indicators[status] || '[CHG]';
+        return constants_1.FILE_STATUS_INDICATORS[status] || '[CHG]';
     }
     getChangeIndicator(additions, deletions) {
         const total = additions + deletions;

@@ -28,7 +28,6 @@ class CloseIssueTool {
                 issue_number: args.issue_number,
                 reason: args.reason
             }, 'Closing GitHub issue');
-            // Add comment if provided
             if (args.comment) {
                 await this.githubClient.createIssueComment({
                     owner: args.owner,
@@ -37,7 +36,6 @@ class CloseIssueTool {
                     body: args.comment
                 });
             }
-            // Close the issue using GitHub API
             const closedIssue = await this.githubClient.updateIssue({
                 owner: args.owner,
                 repo: args.repo,

@@ -4,6 +4,7 @@ exports.CreateIssueTool = void 0;
 const zod_1 = require("zod");
 const logger_1 = require("../utils/logger");
 const error_handler_1 = require("../utils/error-handler");
+const constants_1 = require("../constants");
 const logger = (0, logger_1.createLogger)('CreateIssueTool');
 const CreateIssueInputSchema = zod_1.z.object({
     owner: zod_1.z.string().describe('Repository owner (username or organization)'),
@@ -30,27 +31,14 @@ class CreateIssueTool {
                 repo: args.repo,
                 title: args.title
             }, 'Creating GitHub issue');
-            // Format the issue body professionally
             let formattedBody = args.body || '';
-            // Add priority section if specified
             if (args.priority) {
-                const priorityLabel = {
-                    'low': 'LOW',
-                    'medium': 'MEDIUM',
-                    'high': 'HIGH',
-                    'critical': 'CRITICAL'
-                }[args.priority];
-                formattedBody = `**Priority:** ${priorityLabel}\n\n${formattedBody}`;
+                formattedBody = `**Priority:** ${constants_1.PRIORITY_LABELS[args.priority]}\n\n${formattedBody}`;
             }
-            // Add professional structure if body is provided
-            if (formattedBody && !formattedBody.includes('## ')) {
-                // Check if it's a simple description and add basic structure
-                if (formattedBody.length > 50) {
-                    const originalBody = formattedBody;
-                    formattedBody = `## Description\n\n${originalBody}\n\n## Acceptance Criteria\n\n- [ ] To be defined\n\n## Additional Notes\n\n_Please add any additional context or requirements._`;
-                }
+            if (formattedBody && !formattedBody.includes('## ') && formattedBody.length > 50) {
+                const originalBody = formattedBody;
+                formattedBody = `## Description\n\n${originalBody}\n\n## Acceptance Criteria\n\n- [ ] To be defined\n\n## Additional Notes\n\n_Please add any additional context or requirements._`;
             }
-            // Create the issue using GitHub API
             const issueData = await this.githubClient.createIssue({
                 owner: args.owner,
                 repo: args.repo,

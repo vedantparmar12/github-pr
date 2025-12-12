@@ -33,7 +33,6 @@ class UpdateIssueTool {
                 issue_number: args.issue_number,
                 updates: Object.keys(args).filter(key => key !== 'owner' && key !== 'repo' && key !== 'issue_number' && args[key] !== undefined)
             }, 'Updating GitHub issue');
-            // Build update parameters from provided arguments
             const updateParams = {};
             if (args.title !== undefined)
                 updateParams.title = args.title;
@@ -49,11 +48,9 @@ class UpdateIssueTool {
                 updateParams.milestone = args.milestone;
             if (args.labels !== undefined)
                 updateParams.labels = args.labels;
-            // Validate that at least one field is being updated
             if (Object.keys(updateParams).length === 0) {
                 throw new Error('At least one field must be provided to update the issue');
             }
-            // Update the issue using GitHub API
             const updatedIssue = await this.githubClient.updateIssue({
                 owner: args.owner,
                 repo: args.repo,

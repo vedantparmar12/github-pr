@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.SubmitReviewTool = void 0;
 const mcp_1 = require("../types/mcp");
 const logger_1 = require("../utils/logger");
+const constants_1 = require("../constants");
 const logger = (0, logger_1.createLogger)('SubmitReviewTool');
 class SubmitReviewTool {
     name = 'submit-review';
@@ -113,14 +114,7 @@ class SubmitReviewTool {
         return output;
     }
     getStatusText(state) {
-        const statusMap = {
-            'APPROVED': 'Approved',
-            'CHANGES_REQUESTED': 'Changes Requested',
-            'COMMENTED': 'Commented',
-            'PENDING': 'Pending',
-            'DISMISSED': 'Dismissed'
-        };
-        return statusMap[state] || state;
+        return constants_1.REVIEW_STATUS_MAP[state] || state;
     }
 }
 exports.SubmitReviewTool = SubmitReviewTool;
